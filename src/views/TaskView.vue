@@ -14,11 +14,19 @@
           </div>
           <ul class="list-group list-group-flush">
             <li
+              v-if="tasks.length === 0"
+              class="list-group-item empty-column"
+              @dblclick="createTask(status)"
+            >
+              <em>Doble clic para agregar una tarea</em>
+            </li>
+            <li
               v-for="task in tasks"
               :key="task.id"
-              class="list-group-item"
+              class="list-group-item task-card"
               draggable="true"
               @dragstart="onDragStart(task)"
+              @dblclick="editTask(task)"
             >
               {{ task.description }}
             </li>
@@ -73,16 +81,61 @@ export default {
       this.draggedTask = task;
     },
     onDrop(status) {
-      return (event) => {
+      return async (event) => {
         event.preventDefault();
         if (this.draggedTask) {
-          // Mover la tarea a la nueva columna (actualizar el estado según sea necesario)
-          console.log(`Tarea ${this.draggedTask.description} movida a ${status}`);
-          this.draggedTask.status = status;
-          this.fetchTasks(); // Puedes eliminar y agregar la tarea de manera más eficiente en lugar de recargar todas las tareas
-          this.draggedTask = null;
+          try {
+            // Mover la tarea a la nueva columna (actualizar el estado según sea necesario)
+            await this.$axios.patch(`http://localhost:8000/api/task_manager/tasks/${this.draggedTask.id}/`, {
+              status: status,
+            }, {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem('token')}`,
+              },
+            });
+            this.draggedTask.status = status;
+            this.draggedTask = null;
+          } catch (error) {
+            console.error('Error al mover la tarea:', error);
+          }
         }
       };
+    },
+    async editTask(task) {
+      const newDescription = prompt('Editar descripción de la tarea:', task.description);
+      if (newDescription !== null) {
+        try {
+          await this.$axios.put(`http://localhost:8000/api/task_manager/tasks/${task.id}/`, {
+            description: newDescription,
+          }, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+          });
+          task.description = newDescription;
+        } catch (error) {
+          console.error('Error al editar la tarea:', error);
+        }
+      }
+    },
+    async createTask(status) {
+      const description = prompt('Ingrese la descripción de la nueva tarea:');
+      if (description !== null) {
+        try {
+          const response = await this.$axios.post('http://localhost:8000/api/task_manager/tasks/', {
+            description: description,
+            status: status,
+          }, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+            },
+          });
+          const newTask = response.data;
+          this.tasksByStatus[status].push(newTask);
+        } catch (error) {
+          console.error('Error al crear la tarea:', error);
+        }
+      }
     },
   },
   mounted() {
@@ -103,8 +156,26 @@ export default {
   background-color: #f5f5f5; /* Fondo gris claro */
 }
 
-.task-list {
-  list-style-type: none; /* Elimina el estilo de la lista */
-  padding: 0;
+.task-card {
+  cursor: pointer;
+  margin-bottom: 5px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 8px;
+}
+
+.empty-column {
+  cursor: pointer;
+  background-color: #eee;
+  border: 1px dashed #999;
+  border-radius: 5px;
+  padding: 8px;
+  text-align: center;
+  color: #999;
+}
+
+.empty-column:hover {
+  background-color: #ddd;
 }
 </style>
