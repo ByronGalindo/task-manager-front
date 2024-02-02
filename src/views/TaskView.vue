@@ -12,25 +12,40 @@
           <div class="card-header">
             <h5>{{ status }}</h5>
           </div>
-          <ul class="list-group list-group-flush">
-            <li
-              v-if="tasks.length === 0"
-              class="list-group-item empty-column"
-              @dblclick="createTask(status)"
-            >
-              <em>Doble clic para agregar una tarea</em>
-            </li>
-            <li
-              v-for="task in tasks"
-              :key="task.id"
-              class="list-group-item task-card"
-              draggable="true"
-              @dragstart="onDragStart(task)"
-              @dblclick="editTask(task)"
-            >
-              {{ task.description }}
-            </li>
-          </ul>
+          <ul class="list-group list-group-flush" style="list-style-type: none;">
+  <!-- Oculta los puntos de la lista -->
+
+  <li
+    v-if="tasks.length === 0"
+    class="list-group-item empty-column"
+    @dblclick="createTask(status)"
+  >
+    <em>Doble clic para agregar una tarea</em>
+  </li>
+
+  <li
+    v-for="task in tasks"
+    :key="task.id"
+    class="list-group-item task-card"
+    draggable="true"
+    @dragstart="onDragStart(task)"
+    @dblclick="editTask(task)"
+  >
+    {{ task.description }}
+  </li>
+
+  <!-- Siempre mostrar la opción de agregar tarea -->
+  <li class="list-group-item empty-column" @dblclick="createTask(status)">
+    <em>Doble clic para agregar una tarea</em>
+  </li>
+</ul>
+          <div
+            v-if="tasks.length === 0"
+            class="list-group-item empty-column"
+            @dblclick="createTask(status)"
+          >
+            <em>Doble clic para agregar una tarea</em>
+          </div>
         </div>
       </div>
     </div>
@@ -124,24 +139,25 @@ export default {
       }
     },
     async createTask(status) {
-      const description = prompt('Ingrese la descripción de la nueva tarea:');
-      if (description !== null) {
-        try {
-          const response = await this.$axios.post('http://localhost:8000/api/task_manager/tasks/', {
-            description: description,
-            status: status,
-          }, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
-          });
-          const newTask = response.data;
-          this.columns[status].push(newTask);
-        } catch (error) {
-          console.error('Error al crear la tarea:', error);
-        }
-      }
-    },
+  const description = prompt('Ingrese la descripción de la nueva tarea:');
+  if (description !== null) {
+    try {
+      await this.$axios.post('http://localhost:8000/api/task_manager/tasks/', {
+        description: description,
+        status: status,
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      // Actualizar las tareas después de la creación
+      this.fetchTasks();
+    } catch (error) {
+      console.error('Error al crear la tarea:', error);
+    }
+  }
+},
   },
   mounted() {
     this.fetchTasks();
@@ -168,6 +184,10 @@ export default {
   border: 1px solid #ccc;
   border-radius: 5px;
   padding: 8px;
+}
+
+.task-content {
+  width: 100%; /* Ocupa todo el ancho */
 }
 
 .empty-column {
