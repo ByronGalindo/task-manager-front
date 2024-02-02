@@ -2,11 +2,11 @@
   <div class="container mt-5">
     <div class="columns">
       <div
-        v-for="(tasks, status) in tasksByStatus"
+        v-for="(tasks, status) in columns"
         :key="status"
         class="column"
-        @dragover.prevent="allowDrop"
         @drop="onDrop(status)"
+        @dragover.prevent
       >
         <div class="card">
           <div class="card-header">
@@ -42,21 +42,24 @@ export default {
   name: 'TaskView',
   data() {
     return {
-      tasksByStatus: {},
+      columns: {
+        'todo': [],
+        'in progress': [],
+        'done': [],
+      },
       draggedTask: null,
     };
   },
   methods: {
     organizeTasksByStatus(tasks) {
-      const tasksByStatus = {};
+      const tasksByStatus = {
+        'todo': [],
+        'in progress': [],
+        'done': [],
+      };
 
       tasks.forEach((task) => {
-        const status = task.status;
-        if (!tasksByStatus[status]) {
-          tasksByStatus[status] = [];
-        }
-
-        tasksByStatus[status].push(task);
+        tasksByStatus[task.status].push(task);
       });
 
       return tasksByStatus;
@@ -69,37 +72,39 @@ export default {
           },
         });
 
-        this.tasksByStatus = this.organizeTasksByStatus(response.data.objeto);
+        this.columns = this.organizeTasksByStatus(response.data.objeto);
       } catch (error) {
         console.error('Error al obtener tareas:', error);
       }
-    },
-    allowDrop(event) {
-      event.preventDefault();
     },
     onDragStart(task) {
       this.draggedTask = task;
     },
     onDrop(status) {
-      return async (event) => {
-        event.preventDefault();
-        if (this.draggedTask) {
-          try {
-            // Mover la tarea a la nueva columna (actualizar el estado según sea necesario)
-            await this.$axios.patch(`http://localhost:8000/api/task_manager/tasks/${this.draggedTask.id}/`, {
-              status: status,
-            }, {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem('token')}`,
-              },
-            });
-            this.draggedTask.status = status;
-            this.draggedTask = null;
-          } catch (error) {
-            console.error('Error al mover la tarea:', error);
-          }
+      if (this.draggedTask && this.draggedTask.status !== status) {
+        const index = this.columns[this.draggedTask.status].indexOf(this.draggedTask);
+        if (index !== -1) {
+          this.columns[this.draggedTask.status].splice(index, 1);
+          this.draggedTask.status = status;
+          this.columns[status].push(this.draggedTask);
+
+          this.saveTaskStatus(this.draggedTask.id, status);
         }
-      };
+      }
+      this.draggedTask = null;
+    },
+    async saveTaskStatus(taskId, status) {
+      try {
+        await this.$axios.patch(`http://localhost:8000/api/task_manager/tasks/${taskId}/`, {
+          status: status,
+        }, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+      } catch (error) {
+        console.error('Error al actualizar el estado de la tarea:', error);
+      }
     },
     async editTask(task) {
       const newDescription = prompt('Editar descripción de la tarea:', task.description);
@@ -131,7 +136,7 @@ export default {
             },
           });
           const newTask = response.data;
-          this.tasksByStatus[status].push(newTask);
+          this.columns[status].push(newTask);
         } catch (error) {
           console.error('Error al crear la tarea:', error);
         }
